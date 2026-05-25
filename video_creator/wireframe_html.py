@@ -352,7 +352,7 @@ def render_html(out_path: Path, target_height: int = 720) -> None:
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parent.parent.parent / "assets" / "wireframe.html"
+    out = Path(__file__).resolve().parent.parent / "assets" / "wireframe.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     h = int(sys.argv[1]) if len(sys.argv) > 1 else 720
     render_html(out, target_height=h)

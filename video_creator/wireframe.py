@@ -187,7 +187,7 @@ def render(out_path: Path, target_height: int = 720) -> None:
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parent.parent.parent / "assets" / "wireframe.png"
+    out = Path(__file__).resolve().parent.parent / "assets" / "wireframe.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     h = int(sys.argv[1]) if len(sys.argv) > 1 else 720
     render(out, target_height=h)

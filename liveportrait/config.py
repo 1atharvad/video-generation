@@ -1,7 +1,7 @@
 from pathlib import Path
 
 LIVEPORTRAIT_DIR = Path(__file__).resolve().parent
-BASE_DIR = LIVEPORTRAIT_DIR.parent.parent
+BASE_DIR = LIVEPORTRAIT_DIR.parent
 # LivePortrait
 LP_REPO_DIR = Path(LIVEPORTRAIT_DIR, "LivePortrait")
 LP_REPO_URL = "https://github.com/KlingAIResearch/LivePortrait.git"
