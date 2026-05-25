@@ -145,12 +145,12 @@ if __name__ == "__main__":
     sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
 
     import time
-    from liveportrait.config import BASE_DIR, AUDIO_DIR, DRIVING_VIDEOS_DIR as _DRV
+    from liveportrait.config import BASE_DIR, DRIVING_VIDEOS_DIR as _DRV
     from liveportrait.liveportrait import LivePortrait as _LP
 
-    FACE_IMAGE = _Path(BASE_DIR, "n8n_files", "test_face.jpg")
-    AUDIO_FILE = _Path(AUDIO_DIR, "60f04df5-45b5-4849-b8c3-c5d858c3ec24.wav")
-    OUTPUT_FILE = _Path(BASE_DIR, "n8n_files", "test_output_v4.mp4")
+    FACE_IMAGE = _Path(BASE_DIR, "assets", "test_face.jpg")
+    AUDIO_FILE = _Path(BASE_DIR, "assets", "60f04df5-45b5-4849-b8c3-c5d858c3ec24.wav")
+    OUTPUT_FILE = _Path(BASE_DIR, "assets", "test_output_v4.mp4")
 
     print(f"Face   : {FACE_IMAGE}")
     print(f"Audio  : {AUDIO_FILE}")

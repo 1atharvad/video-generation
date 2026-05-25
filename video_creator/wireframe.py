@@ -1,7 +1,7 @@
 """
 Render a labeled wireframe of the news-panel layout.
 Run:  python -m video_creator.wireframe   OR   python3 wireframe.py [height]
-Output: n8n_files/wireframe.png
+Output: assets/wireframe.png
 """
 import sys
 from pathlib import Path
@@ -187,7 +187,7 @@ def render(out_path: Path, target_height: int = 720) -> None:
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parent.parent.parent / "n8n_files" / "wireframe.png"
+    out = Path(__file__).resolve().parent.parent.parent / "assets" / "wireframe.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     h = int(sys.argv[1]) if len(sys.argv) > 1 else 720
     render(out, target_height=h)

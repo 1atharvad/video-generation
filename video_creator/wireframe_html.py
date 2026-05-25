@@ -1,7 +1,7 @@
 """
 Generate an HTML/CSS wireframe of the news-panel layout.
 Run:  python3 api_v4/video_creator/wireframe_html.py
-Output: n8n_files/wireframe.html  (open in any browser)
+Output: assets/wireframe.html  (open in any browser)
 """
 import sys
 from pathlib import Path
@@ -352,7 +352,7 @@ def render_html(out_path: Path, target_height: int = 720) -> None:
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parent.parent.parent / "n8n_files" / "wireframe.html"
+    out = Path(__file__).resolve().parent.parent.parent / "assets" / "wireframe.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     h = int(sys.argv[1]) if len(sys.argv) > 1 else 720
     render_html(out, target_height=h)
