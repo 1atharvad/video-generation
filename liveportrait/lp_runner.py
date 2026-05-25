@@ -38,15 +38,8 @@ def _get_pipeline():
     device = _get_device()
     print(f"LivePortrait using device: {device}")
 
-    # Try passing device_id as constructor arg; fall back to setting it after
-    try:
-        inf_cfg = InferenceConfig(device_id=device)
-    except TypeError:
-        inf_cfg = InferenceConfig()
-        inf_cfg.device_id = device
-
     _pipeline = LivePortraitPipeline(
-        inference_cfg=inf_cfg,
+        inference_cfg=InferenceConfig(),
         crop_cfg=CropConfig(),
     )
     return _pipeline

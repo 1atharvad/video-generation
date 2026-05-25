@@ -105,34 +105,40 @@ def patch_liveportrait_for_pose_eyes():
 
 
 def patch_liveportrait_device():
-    """Replace hardcoded 'cuda' device in InferenceConfig with runtime detection."""
-    inf_cfg_py = Path(LP_REPO_DIR, "src", "config", "inference_config.py")
-    if not inf_cfg_py.exists():
+    """Patch LivePortraitWrapper to use runtime device detection instead of hardcoded cuda."""
+    wrapper_py = Path(LP_REPO_DIR, "src", "live_portrait_wrapper.py")
+    if not wrapper_py.exists():
         return
 
-    text = inf_cfg_py.read_text()
+    text = wrapper_py.read_text()
     sentinel = "# device-patch"
     if sentinel in text:
         return
 
-    device_import = "import torch\n"
-    device_value = (
-        '"cuda" if torch.cuda.is_available() else '
-        '("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu")'
+    device_expr = (
+        'torch.device("cuda" if torch.cuda.is_available() else '
+        '("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu"))'
+        f'  {sentinel}'
     )
 
+    # Covers both f-string quote styles used across LP versions
+    patterns = [
+        f'torch.device(f"cuda:{{inference_cfg.device_id}}")',
+        f"torch.device(f'cuda:{{inference_cfg.device_id}}')",
+        f'torch.device("cuda:" + str(inference_cfg.device_id))',
+    ]
+
     patched = text
-    # Cover both common field name variants used across LP versions
-    for field in ('device_id: str = "cuda"', "device: str = \"cuda\""):
-        if field in patched:
-            new_field = field.split("=")[0] + f"= {device_value}  {sentinel}"
-            patched = patched.replace(field, new_field)
+    for pat in patterns:
+        if pat in patched:
+            patched = patched.replace(pat, device_expr)
+            break
 
     if patched != text:
-        if "import torch" not in patched:
-            patched = device_import + patched
-        inf_cfg_py.write_text(patched)
-        print("Patched LivePortrait InferenceConfig for cross-platform device detection.")
+        wrapper_py.write_text(patched)
+        print("Patched LivePortrait wrapper for cross-platform device detection.")
+    else:
+        print("Warning: could not find device string pattern in live_portrait_wrapper.py — manual check needed.")
 
 
 def patch_wav2lip_for_mps():
