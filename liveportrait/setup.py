@@ -115,24 +115,43 @@ def patch_liveportrait_device():
     if sentinel in text:
         return
 
+    patched = text
+
+    # Variant A: f-string / string-concat torch.device(...) call
     device_expr = (
         'torch.device("cuda" if torch.cuda.is_available() else '
         '("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu"))'
         f'  {sentinel}'
     )
-
-    # Covers both f-string quote styles used across LP versions
-    patterns = [
-        f'torch.device(f"cuda:{{inference_cfg.device_id}}")',
-        f"torch.device(f'cuda:{{inference_cfg.device_id}}')",
-        f'torch.device("cuda:" + str(inference_cfg.device_id))',
-    ]
-
-    patched = text
-    for pat in patterns:
+    for pat in [
+        'torch.device(f"cuda:{inference_cfg.device_id}")',
+        "torch.device(f'cuda:{inference_cfg.device_id}')",
+        'torch.device("cuda:" + str(inference_cfg.device_id))',
+    ]:
         if pat in patched:
             patched = patched.replace(pat, device_expr)
             break
+
+    # Variant B: try/except block that assigns self.device directly
+    old_block = (
+        "        try:\n"
+        "            if torch.backends.mps.is_available():\n"
+        "                self.device = 'mps'\n"
+        "            else:\n"
+        "                self.device = 'cuda:' + str(self.device_id)\n"
+        "        except:\n"
+        "            self.device = 'cuda:' + str(self.device_id)"
+    )
+    new_block = (
+        f"        if torch.cuda.is_available():  {sentinel}\n"
+        "            self.device = 'cuda:' + str(self.device_id)\n"
+        "        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():\n"
+        "            self.device = 'mps'\n"
+        "        else:\n"
+        "            self.device = 'cpu'"
+    )
+    if old_block in patched:
+        patched = patched.replace(old_block, new_block)
 
     if patched != text:
         wrapper_py.write_text(patched, encoding="utf-8")
