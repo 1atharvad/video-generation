@@ -1,4 +1,6 @@
+import functools
 import subprocess
+import sys
 from pathlib import Path
 
 from tqdm import tqdm
@@ -6,6 +8,25 @@ from tqdm import tqdm
 from .config import GFPGAN_MODEL_PATH
 
 _gfpgan = None
+
+
+@functools.lru_cache(maxsize=1)
+def _hevc_encoder() -> tuple[str, list[str]]:
+    candidates = [
+        ("hevc_videotoolbox", ["-q:v", "65", "-tag:v", "hvc1"]),
+        ("hevc_nvenc",        ["-cq",  "28"]),
+        ("libx265",           ["-crf", "28", "-preset", "fast"]),
+        ("libx264",           ["-crf", "23", "-preset", "fast"]),
+    ]
+    for encoder, quality_args in candidates:
+        r = subprocess.run(
+            ["ffmpeg", "-f", "lavfi", "-i", "nullsrc=s=16x16:d=0.1",
+             "-c:v", encoder, "-f", "null", "-"],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            return encoder, quality_args
+    raise RuntimeError("No video encoder found — install ffmpeg with H.264/H.265 support.")
 
 
 def patch_basicsr_for_mps():
@@ -46,6 +67,9 @@ def load_gfpgan():
     if _gfpgan is not None:
         return _gfpgan
     import torch
+    import torchvision.transforms.functional as _tvf
+    if "torchvision.transforms.functional_tensor" not in sys.modules:
+        sys.modules["torchvision.transforms.functional_tensor"] = _tvf
     from gfpgan import GFPGANer
 
     if torch.cuda.is_available():
@@ -78,12 +102,13 @@ def enhance_video(
         vf = f"scale=iw*{upscale}:ih*{upscale}:flags=lanczos,{vf}"
 
     if not face_restore:
+        encoder, quality_args = _hevc_encoder()
         subprocess.run(
             [
                 "ffmpeg", "-y", "-loglevel", "error",
                 "-i", str(input_path),
                 "-vf", vf,
-                "-c:v", "hevc_videotoolbox", "-q:v", "65", "-tag:v", "hvc1",
+                "-c:v", encoder, *quality_args,
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "128k",
                 str(output_path),
@@ -119,13 +144,14 @@ def enhance_video(
     cap.release()
     writer.release()
 
+    encoder, quality_args = _hevc_encoder()
     subprocess.run(
         [
             "ffmpeg", "-y", "-loglevel", "error",
             "-i", str(tmp_video), "-i", str(input_path),
             "-map", "0:v", "-map", "1:a",
             "-vf", "hqdn3d=0:0:3:3",
-            "-c:v", "hevc_videotoolbox", "-q:v", "65", "-tag:v", "hvc1",
+            "-c:v", encoder, *quality_args,
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k",
             str(output_path),
