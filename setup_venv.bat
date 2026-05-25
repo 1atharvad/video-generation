@@ -45,17 +45,17 @@ call venv\Scripts\activate.bat
 
 python -m pip install --upgrade pip
 
-:: Use CUDA requirements if an NVIDIA GPU is present
-set REQS=requirements.txt
+:: Install CUDA PyTorch first if an NVIDIA GPU is present
 nvidia-smi >nul 2>&1
 if not errorlevel 1 (
     echo NVIDIA GPU detected — installing CUDA-enabled PyTorch...
-    set REQS=requirements-cuda.txt
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    if errorlevel 1 ( echo ERROR: CUDA PyTorch install failed. & pause & exit /b 1 )
 ) else (
     echo No NVIDIA GPU detected — installing CPU-only PyTorch...
 )
 
-pip install -r %REQS%
+pip install -r requirements.txt
 if errorlevel 1 ( echo ERROR: pip install failed. & pause & exit /b 1 )
 
 echo.
