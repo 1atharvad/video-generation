@@ -522,12 +522,12 @@ def create_video_with_text(
 if __name__ == "__main__":
     import sys
 
-    N8N_FILES    = Path(__file__).resolve().parent.parent / "assets"
-    input_video  = N8N_FILES / "test_output_v4.mp4"
-    output_video = N8N_FILES / "new_test_output_v4.mp4"
+    ASSET_FIlES    = Path(__file__).resolve().parent.parent / "assets"
+    input_video  = ASSET_FIlES / "test_output_v4.mp4"
+    output_video = ASSET_FIlES / "new_test_output_v4.mp4"
 
     # Optional: place a logo PNG at assets/company_logo.png to test logo rendering
-    logo = N8N_FILES / "company_logo.png"
+    logo = ASSET_FIlES / "company_logo.png"
 
     result = create_video_with_text(
         video_path  = input_video,
