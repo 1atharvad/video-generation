@@ -49,7 +49,6 @@ liveportrait/driving_videos/*_trim*.pkl
 *.avi
 *.mov
 *.mkv
-*.wav
 *.mp3
 *.flac
 outputs/
