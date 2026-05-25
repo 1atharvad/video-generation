@@ -4,10 +4,20 @@ import tempfile
 import threading
 from pathlib import Path
 
+import torch
+
 from .config import LP_REPO_DIR
 
 _pipeline = None
 _lock = threading.Lock()
+
+
+def _get_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 def _ensure_path():
@@ -25,8 +35,18 @@ def _get_pipeline():
     from src.config.crop_config import CropConfig
     from src.live_portrait_pipeline import LivePortraitPipeline
 
+    device = _get_device()
+    print(f"LivePortrait using device: {device}")
+
+    # Try passing device_id as constructor arg; fall back to setting it after
+    try:
+        inf_cfg = InferenceConfig(device_id=device)
+    except TypeError:
+        inf_cfg = InferenceConfig()
+        inf_cfg.device_id = device
+
     _pipeline = LivePortraitPipeline(
-        inference_cfg=InferenceConfig(),
+        inference_cfg=inf_cfg,
         crop_cfg=CropConfig(),
     )
     return _pipeline
