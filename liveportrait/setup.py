@@ -83,7 +83,7 @@ def patch_liveportrait_for_pose_eyes():
     inf_cfg_py = Path(LP_REPO_DIR, "src", "config", "inference_config.py")
 
     sentinel = '"pose_eyes"'
-    text = pipeline_py.read_text()
+    text = pipeline_py.read_text(encoding="utf-8")
     if sentinel not in text:
         text = text.replace(
             '== "all" or inf_cfg.animation_region == "pose"',
@@ -93,15 +93,15 @@ def patch_liveportrait_for_pose_eyes():
             'animation_region == "eyes":',
             'animation_region in ("eyes", "pose_eyes"):',
         )
-        pipeline_py.write_text(text)
+        pipeline_py.write_text(text, encoding="utf-8")
         print("Patched LivePortrait pipeline for pose_eyes support.")
 
     old_literal = 'Literal["exp", "pose", "lip", "eyes", "all"]'
     new_literal = 'Literal["exp", "pose", "lip", "eyes", "all", "pose_eyes"]'
     for cfg_py in (arg_cfg_py, inf_cfg_py):
-        text = cfg_py.read_text()
+        text = cfg_py.read_text(encoding="utf-8")
         if old_literal in text:
-            cfg_py.write_text(text.replace(old_literal, new_literal))
+            cfg_py.write_text(text.replace(old_literal, new_literal), encoding="utf-8")
 
 
 def patch_liveportrait_device():
@@ -110,7 +110,7 @@ def patch_liveportrait_device():
     if not wrapper_py.exists():
         return
 
-    text = wrapper_py.read_text()
+    text = wrapper_py.read_text(encoding="utf-8")
     sentinel = "# device-patch"
     if sentinel in text:
         return
@@ -135,7 +135,7 @@ def patch_liveportrait_device():
             break
 
     if patched != text:
-        wrapper_py.write_text(patched)
+        wrapper_py.write_text(patched, encoding="utf-8")
         print("Patched LivePortrait wrapper for cross-platform device detection.")
     else:
         print("Warning: could not find device string pattern in live_portrait_wrapper.py — manual check needed.")
@@ -147,19 +147,19 @@ def patch_wav2lip_for_mps():
 
     old = "device = 'cuda' if torch.cuda.is_available() else 'cpu'"
     new = "device = 'cuda' if torch.cuda.is_available() else ('mps' if torch.backends.mps.is_available() else 'cpu')"
-    text = inference_py.read_text()
+    text = inference_py.read_text(encoding="utf-8")
     if old in text:
-        inference_py.write_text(text.replace(old, new))
+        inference_py.write_text(text.replace(old, new), encoding="utf-8")
         print("Patched Wav2Lip inference.py for MPS support.")
 
     old = "if 'cpu' not in device and 'cuda' not in device:"
     new = "if 'cpu' not in device and 'cuda' not in device and 'mps' not in device:"
-    text = core_py.read_text()
+    text = core_py.read_text(encoding="utf-8")
     if old in text:
-        core_py.write_text(text.replace(old, new))
+        core_py.write_text(text.replace(old, new), encoding="utf-8")
         print("Patched Wav2Lip core.py for MPS support.")
 
-    text = inference_py.read_text()
+    text = inference_py.read_text(encoding="utf-8")
     patched = text
     patched = patched.replace(
         "'ffmpeg -y -i {} -strict -2 {}'.format(args.audio, 'temp/temp.wav')",
@@ -170,7 +170,7 @@ def patch_wav2lip_for_mps():
         "'ffmpeg -y -loglevel error -i {} -i {} -strict -2 -q:v 1 {}'.format(args.audio, 'temp/result.avi', args.outfile)",
     )
     if patched != text:
-        inference_py.write_text(patched)
+        inference_py.write_text(patched, encoding="utf-8")
         print("Patched Wav2Lip inference.py to suppress ffmpeg output.")
 
 
