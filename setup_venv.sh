@@ -3,6 +3,29 @@ set -e
 
 cd "$(dirname "$0")"
 
+# ── Homebrew ────────────────────────────────────────────────────────────────
+if ! command -v brew &>/dev/null; then
+    echo "Homebrew not found — installing..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Add brew to PATH for the rest of this session (Apple Silicon path)
+    if [[ -f /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
+fi
+
+# ── Python 3.10 ─────────────────────────────────────────────────────────────
+if ! command -v python3.10 &>/dev/null; then
+    echo "Python 3.10 not found — installing via Homebrew..."
+    brew install python@3.10
+fi
+
+# ── ffmpeg ───────────────────────────────────────────────────────────────────
+if ! command -v ffmpeg &>/dev/null; then
+    echo "ffmpeg not found — installing via Homebrew..."
+    brew install ffmpeg
+fi
+
+# ── Virtual environment ──────────────────────────────────────────────────────
 echo "Creating Python 3.10 venv..."
 python3.10 -m venv venv
 
@@ -13,13 +36,13 @@ pip install -r requirements.txt
 
 echo ""
 echo "Setup complete."
-echo "To activate: source api_v4/venv/bin/activate"
-echo "To start the service: uvicorn main:app --host 0.0.0.0 --port 8003"
 echo ""
-echo "NOTE: Place a neutral driving video at:"
-echo "  api_v4/liveportrait/driving_videos/neutral.mp4"
-echo "  This is used as the default head motion reference for all generations."
-echo "  Any short (~5-10s) clip of a person talking neutrally works well."
+echo "To activate the environment in future sessions:"
+echo "  source venv/bin/activate"
 echo ""
-echo "NOTE: Set LIPSYNC_API_URL env var if api_v2 runs on a non-default port/host."
-echo "  Default: http://localhost:8001"
+echo "Next step — download models and clone repos:"
+echo "  python -c \"from liveportrait.setup import setup_all; setup_all()\""
+echo ""
+echo "NOTE: Place a driving video PKL at:"
+echo "  liveportrait/driving_videos/"
+echo "  (run setup_all above to populate defaults)"

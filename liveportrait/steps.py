@@ -1,3 +1,4 @@
+import functools
 import math
 import pickle
 import subprocess
@@ -9,17 +10,45 @@ from .lp_runner import run_liveportrait as _lp_run
 from .w2l_runner import run_lipsync as _w2l_run
 
 
-def prepare_driving_video(driving_video: Path, max_secs: int = 7, max_height: int = 512) -> Path:
-    probe = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", str(driving_video)],
-        capture_output=True, text=True,
+@functools.lru_cache(maxsize=1)
+def _h264_encoder() -> tuple[str, list[str]]:
+    """Pick the best available H.264 encoder: Apple VT → NVENC → software."""
+    candidates = [
+        ("h264_videotoolbox", ["-q:v", "75"]),
+        ("h264_nvenc",        ["-cq",  "28"]),
+        ("libx264",           ["-crf", "23", "-preset", "fast"]),
+    ]
+    for encoder, quality_args in candidates:
+        r = subprocess.run(
+            ["ffmpeg", "-f", "lavfi", "-i", "nullsrc=s=16x16:d=0.1",
+             "-c:v", encoder, "-f", "null", "-"],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            return encoder, quality_args
+    raise RuntimeError(
+        "No H.264 encoder found. Install ffmpeg with libx264 support:\n"
+        "  Mac:     brew install ffmpeg\n"
+        "  Windows: https://www.gyan.dev/ffmpeg/builds/ (add bin/ to PATH)"
     )
+
+
+def _ffprobe(args: list[str]) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(["ffprobe"] + args, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise RuntimeError(
+            "ffprobe not found. Install ffmpeg:\n"
+            "  Mac:     brew install ffmpeg\n"
+            "  Windows: https://www.gyan.dev/ffmpeg/builds/ (add bin/ to PATH)"
+        )
+
+
+def prepare_driving_video(driving_video: Path, max_secs: int = 7, max_height: int = 512) -> Path:
+    probe = _ffprobe(["-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", str(driving_video)])
     duration = float(probe.stdout.strip()) if probe.returncode == 0 and probe.stdout.strip() else 999.0
 
-    probe_res = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-show_entries", "stream=height", "-of", "csv=p=0", str(driving_video)],
-        capture_output=True, text=True,
-    )
+    probe_res = _ffprobe(["-v", "quiet", "-show_entries", "stream=height", "-of", "csv=p=0", str(driving_video)])
     height = int(probe_res.stdout.strip().split("\n")[0]) if probe_res.returncode == 0 and probe_res.stdout.strip() else 9999
 
     needs_trim = duration > max_secs
@@ -28,6 +57,7 @@ def prepare_driving_video(driving_video: Path, max_secs: int = 7, max_height: in
     if not needs_trim and not needs_scale:
         return driving_video
 
+    encoder, quality_args = _h264_encoder()
     tmp = Path(tempfile.mktemp(suffix=".mp4"))
     vf_parts = []
     if needs_scale:
@@ -37,7 +67,7 @@ def prepare_driving_video(driving_video: Path, max_secs: int = 7, max_height: in
 
     subprocess.run(
         ["ffmpeg", "-y", "-i", str(driving_video), *trim_args, *vf_filter,
-         "-c:v", "h264_videotoolbox", "-q:v", "75", "-an", str(tmp)],
+         "-c:v", encoder, *quality_args, "-an", str(tmp)],
         capture_output=True,
     )
     print(f"Driving video prepared: {duration:.1f}s→{min(duration, max_secs):.0f}s, "
@@ -77,24 +107,19 @@ def run_liveportrait(
 
 
 def make_seamless_loop(animated: Path, audio: Path, output: Path) -> Path:
-    probe = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(audio)],
-        capture_output=True, text=True,
-    )
+    probe = _ffprobe(["-v", "quiet", "-show_entries", "format=duration",
+                      "-of", "csv=p=0", str(audio)])
     if probe.returncode != 0 or not probe.stdout.strip():
         return animated
     audio_dur = float(probe.stdout.strip())
 
-    probe2 = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(animated)],
-        capture_output=True, text=True,
-    )
+    probe2 = _ffprobe(["-v", "quiet", "-show_entries", "format=duration",
+                       "-of", "csv=p=0", str(animated)])
     if probe2.returncode != 0 or not probe2.stdout.strip():
         return animated
     clip_dur = float(probe2.stdout.strip())
 
+    encoder, quality_args = _h264_encoder()
     cycle_dur = clip_dur * 2
     n_cycles = math.ceil(audio_dur / cycle_dur) + 1
 
@@ -103,7 +128,7 @@ def make_seamless_loop(animated: Path, audio: Path, output: Path) -> Path:
         [
             "ffmpeg", "-y", "-i", str(animated),
             "-filter_complex", "[0:v]reverse[r];[0:v][r]concat=n=2:v=1[out]",
-            "-map", "[out]", "-c:v", "h264_videotoolbox", "-q:v", "75", "-an", str(pingpong_tmp),
+            "-map", "[out]", "-c:v", encoder, *quality_args, "-an", str(pingpong_tmp),
         ],
         capture_output=True,
     )
@@ -115,7 +140,7 @@ def make_seamless_loop(animated: Path, audio: Path, output: Path) -> Path:
             "ffmpeg", "-y",
             "-stream_loop", str(n_cycles), "-i", str(pingpong_tmp),
             "-t", str(audio_dur + 0.5),
-            "-c:v", "h264_videotoolbox", "-q:v", "75", "-an", str(output),
+            "-c:v", encoder, *quality_args, "-an", str(output),
         ],
         capture_output=True,
     )
