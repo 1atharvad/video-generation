@@ -517,7 +517,7 @@ def create_video_with_text(
 if __name__ == "__main__":
     import sys
 
-    N8N_FILES    = Path(__file__).resolve().parent.parent.parent / "assets"
+    N8N_FILES    = Path(__file__).resolve().parent.parent / "assets"
     input_video  = N8N_FILES / "test_output_v4.mp4"
     output_video = N8N_FILES / "new_test_output_v4.mp4"
 
