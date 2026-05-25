@@ -94,7 +94,8 @@ video-generation/
 │   └── steps.py
 ├── video_creator/           # Video layout and rendering
 ├── gfpgan/                  # GFPGAN weights dir
-├── requirements.txt
+├── requirements.txt         # CPU (Mac + Windows fallback)
+├── requirements-cuda.txt    # NVIDIA GPU — selected automatically by setup_venv.bat
 ├── setup_venv.sh            # Mac setup
 └── setup_venv.bat           # Windows setup
 ```
