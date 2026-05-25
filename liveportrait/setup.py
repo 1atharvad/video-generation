@@ -132,23 +132,23 @@ def patch_liveportrait_device():
             patched = patched.replace(pat, device_expr)
             break
 
-    # Variant B: try/except block that assigns self.device directly
+    # Variant B: try/except block (nested inside else:) that assigns self.device directly
     old_block = (
-        "        try:\n"
-        "            if torch.backends.mps.is_available():\n"
-        "                self.device = 'mps'\n"
-        "            else:\n"
-        "                self.device = 'cuda:' + str(self.device_id)\n"
-        "        except:\n"
-        "            self.device = 'cuda:' + str(self.device_id)"
+        "            try:\n"
+        "                if torch.backends.mps.is_available():\n"
+        "                    self.device = 'mps'\n"
+        "                else:\n"
+        "                    self.device = 'cuda:' + str(self.device_id)\n"
+        "            except:\n"
+        "                self.device = 'cuda:' + str(self.device_id)"
     )
     new_block = (
-        f"        if torch.cuda.is_available():  {sentinel}\n"
-        "            self.device = 'cuda:' + str(self.device_id)\n"
-        "        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():\n"
-        "            self.device = 'mps'\n"
-        "        else:\n"
-        "            self.device = 'cpu'"
+        f"            if torch.cuda.is_available():  {sentinel}\n"
+        "                self.device = 'cuda:' + str(self.device_id)\n"
+        "            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():\n"
+        "                self.device = 'mps'\n"
+        "            else:\n"
+        "                self.device = 'cpu'"
     )
     if old_block in patched:
         patched = patched.replace(old_block, new_block)
