@@ -166,7 +166,7 @@ if __name__ == "__main__":
         driving_max_secs=5.0,
         resize_factor=1,
         face_restore=True,
-        face_restore_step=2,
+        face_restore_step=3,
         expression_multiplier=0.7,
         smooth_observation_variance=3e-4,
     )
