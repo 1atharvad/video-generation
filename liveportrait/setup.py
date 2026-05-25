@@ -1,6 +1,7 @@
 import re
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 from tqdm import tqdm
@@ -15,24 +16,21 @@ from .config import (
 )
 
 
-def download_with_wget(url: str, destination: Path):
+def download_file(url: str, destination: Path):
     destination.parent.mkdir(parents=True, exist_ok=True)
-    cmd = ["wget", "--progress=bar:force:noscroll", "-O", str(destination), url]
+    bar = tqdm(unit="B", unit_scale=True, unit_divisor=1024, desc=destination.name)
+
+    def _progress(block_count, block_size, total_size):
+        if bar.total is None and total_size > 0:
+            bar.total = total_size
+        bar.update(block_count * block_size - bar.n)
+
     try:
-        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1) as proc:
-            bar = tqdm(total=100, unit="%", desc=f"Downloading {destination.name}")
-            pattern = re.compile(r"\s*(\d+)%\s*")
-            for line in proc.stdout:
-                m = pattern.search(line)
-                if m:
-                    bar.n = int(m.group(1))
-                    bar.refresh()
-            bar.close()
-            proc.wait()
+        urllib.request.urlretrieve(url, destination, reporthook=_progress)
+        bar.close()
         print(f"Download complete: {destination}\n")
-    except FileNotFoundError:
-        print("Error: `wget` not found.")
     except Exception as e:
+        bar.close()
         print(f"Download error: {e}")
 
 
@@ -106,6 +104,37 @@ def patch_liveportrait_for_pose_eyes():
             cfg_py.write_text(text.replace(old_literal, new_literal))
 
 
+def patch_liveportrait_device():
+    """Replace hardcoded 'cuda' device in InferenceConfig with runtime detection."""
+    inf_cfg_py = Path(LP_REPO_DIR, "src", "config", "inference_config.py")
+    if not inf_cfg_py.exists():
+        return
+
+    text = inf_cfg_py.read_text()
+    sentinel = "# device-patch"
+    if sentinel in text:
+        return
+
+    device_import = "import torch\n"
+    device_value = (
+        '"cuda" if torch.cuda.is_available() else '
+        '("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu")'
+    )
+
+    patched = text
+    # Cover both common field name variants used across LP versions
+    for field in ('device_id: str = "cuda"', "device: str = \"cuda\""):
+        if field in patched:
+            new_field = field.split("=")[0] + f"= {device_value}  {sentinel}"
+            patched = patched.replace(field, new_field)
+
+    if patched != text:
+        if "import torch" not in patched:
+            patched = device_import + patched
+        inf_cfg_py.write_text(patched)
+        print("Patched LivePortrait InferenceConfig for cross-platform device detection.")
+
+
 def patch_wav2lip_for_mps():
     inference_py = Path(WAV2LIP_DIR, "inference.py")
     core_py = Path(WAV2LIP_DIR, "face_detection", "detection", "core.py")
@@ -144,6 +173,7 @@ def setup_all():
     clone_repo(WAV2LIP_REPO_URL, WAV2LIP_DIR, "Wav2Lip")
     GFPGAN_WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
     patch_liveportrait_for_pose_eyes()
+    patch_liveportrait_device()
     patch_wav2lip_for_mps()
 
     lp_weights = Path(LP_REPO_DIR, "pretrained_weights", "liveportrait", "base_models", "appearance_feature_extractor.pth")
@@ -164,7 +194,7 @@ def setup_all():
             print(f"  • {name}")
         print()
         for path, url, _ in missing:
-            download_with_wget(url, path)
+            download_file(url, path)
 
     if not CHECKPOINT_PATH.exists():
         print("Missing model files:\n  • wav2lip_gan.pth (Wav2Lip checkpoint)\n")
