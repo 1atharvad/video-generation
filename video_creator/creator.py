@@ -425,31 +425,36 @@ def create_video_with_text(
         print("[3/3] Compositing:")
 
         ticker_unit = (
-            f"    {position.upper()}    ·    {company}    ·    {location}"
-            f"    ·    EXP: {experience}    ·    " +
-            "    ·    ".join(s.upper() for s in skills) + "    ·    "
+            f"    {position.upper()}    |    {company}    |    {location}"
+            f"    |    EXP: {experience}    |    " +
+            "    |    ".join(s.upper() for s in skills) + "    |    "
         )
         # Repeat 10× so the scroll appears infinite for any reasonable video length
         ticker_text = ticker_unit * 10
 
         def _safe(t):
+            # Escape for ffmpeg filter syntax: backslash, single-quote, colon
             return t.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+
+        def _font_path(p: Path) -> str:
+            # ffmpeg filter syntax needs forward slashes and escaped drive-letter colon
+            return str(p).replace("\\", "/").replace(":/", "\\:/")
 
         ticker_safe = _safe(ticker_text)
 
         speed = 80
 
         _inter_italic = _FONTS_DIR / "Inter-Italic.ttf"
-        ffmpeg_font = (
-            str(_inter_italic) if _inter_italic.exists()
-            else "/System/Library/Fonts/Helvetica.ttc"
-            if Path("/System/Library/Fonts/Helvetica.ttc").exists()
-            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-        )
+        if _inter_italic.exists():
+            ffmpeg_font = _font_path(_inter_italic)
+        elif Path("/System/Library/Fonts/Helvetica.ttc").exists():
+            ffmpeg_font = "/System/Library/Fonts/Helvetica.ttc"
+        else:
+            ffmpeg_font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
         # 10× repeated text → tw ≈ 30,000 px → loops every ~6.5 min (effectively infinite)
         drawtext = (
-            f"drawtext=fontfile={ffmpeg_font}:"
+            f"drawtext=fontfile='{ffmpeg_font}':"
             f"text='{ticker_safe}':"
             f"fontsize={lm.ticker_font}:"
             f"fontcolor=white:"
