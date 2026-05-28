@@ -2,7 +2,45 @@ import sys
 import time
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+from liveportrait.liveportrait import LivePortrait
+
+
+def animate_video(
+    face_image: str | Path,
+    driving_video: str | Path,
+    output: str | Path,
+    expression_multiplier: float = 1.0,
+    smooth_observation_variance: float = 1e-4,
+    animation_region: str = "all",
+) -> dict:
+    face_image    = Path(face_image)
+    driving_video = Path(driving_video)
+    output        = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 60)
+    print("LivePortrait — live anchor mode")
+    print("=" * 60)
+    t0 = time.time()
+    lp = LivePortrait()
+    result = lp.animate(
+        source_image                = face_image,
+        driving_video               = driving_video,
+        output                      = output,
+        expression_multiplier       = expression_multiplier,
+        smooth_observation_variance = smooth_observation_variance,
+        animation_region            = animation_region,
+    )
+
+    t = result.get("timings", {})
+    if t:
+        print(f"\nDone in {time.time() - t0:.0f}s")
+        print(f"  LivePortrait : {t.get('liveportrait', 0):.0f}s")
+        print(f"  Audio merge  : {t.get('merge', 0):.0f}s")
+
+    return result
 
 
 def generate_video(
@@ -15,8 +53,6 @@ def generate_video(
     expression_multiplier: float = 0.7,
     smooth_observation_variance: float = 3e-4,
 ) -> dict:
-    from liveportrait.liveportrait import LivePortrait
-
     face_image = Path(face_image)
     audio      = Path(audio)
     output     = Path(output)
@@ -51,9 +87,9 @@ def generate_video(
 
 if __name__ == "__main__":
     result = generate_video(
-        face_image  = BASE_DIR / "assets" / "test_face.jpg",
-        audio       = BASE_DIR / "assets" / "60f04df5-45b5-4849-b8c3-c5d858c3ec24.wav",
-        output      = BASE_DIR / "assets" / "final_output.mp4",
+        face_image = BASE_DIR / "assets" / "test_face.jpg",
+        audio      = BASE_DIR / "assets" / "audio.wav",
+        output     = BASE_DIR / "assets" / "final_output.mp4",
     )
 
     if result["status"] == "completed":

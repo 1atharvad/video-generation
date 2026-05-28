@@ -1,0 +1,72 @@
+services:
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    image: video-generation:latest
+    command: python3 -m uvicorn src.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app/src
+    volumes:
+      - uploads:/app/uploads
+      - outputs:/app/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  x-worker: &worker-base
+    image: video-generation:latest
+    command: python3 src/worker.py
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app/src
+    volumes:
+      - uploads:/app/uploads
+      - outputs:/app/outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  worker-0:
+    <<: *worker-base
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app/src
+      - WORKER_ID=0
+
+  worker-1:
+    <<: *worker-base
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app/src
+      - WORKER_ID=1
+
+volumes:
+  uploads:
+  outputs:

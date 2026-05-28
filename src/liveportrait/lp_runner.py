@@ -10,6 +10,7 @@ from .config import LP_REPO_DIR
 
 _pipeline = None
 _lock = threading.Lock()
+_init_lock = threading.Lock()
 
 
 def _get_device() -> str:
@@ -17,7 +18,7 @@ def _get_device() -> str:
         return "cuda"
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         return "mps"
-    return "cpu"
+    raise RuntimeError("No GPU found. CUDA or Apple MPS is required — CPU inference is not supported.")
 
 
 def _ensure_path():
@@ -53,6 +54,7 @@ def run_liveportrait(
     flag_pasteback: bool,
     animation_region: str = "pose_eyes",
     smooth_observation_variance: float = 3e-4,
+    flag_crop_driving_video: bool = False,
 ) -> dict:
     _ensure_path()
     from src.config.argument_config import ArgumentConfig
@@ -64,6 +66,7 @@ def run_liveportrait(
         inf_cfg.flag_pasteback = flag_pasteback
         inf_cfg.animation_region = animation_region
         inf_cfg.driving_smooth_observation_variance = smooth_observation_variance
+        inf_cfg.flag_crop_driving_video = flag_crop_driving_video
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             args = ArgumentConfig(

@@ -58,18 +58,22 @@ def prepare_driving_video(driving_video: Path, max_secs: int = 7, max_height: in
         return driving_video
 
     encoder, quality_args = _h264_encoder()
-    tmp = Path(tempfile.mktemp(suffix=".mp4"))
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as _f:
+        tmp = Path(_f.name)
     vf_parts = []
     if needs_scale:
         vf_parts.append(f"scale=-2:{max_height}")
     vf_filter = ["-vf", ",".join(vf_parts)] if vf_parts else []
     trim_args = ["-t", str(max_secs)] if needs_trim else []
 
-    subprocess.run(
+    r = subprocess.run(
         ["ffmpeg", "-y", "-i", str(driving_video), *trim_args, *vf_filter,
          "-c:v", encoder, *quality_args, "-an", str(tmp)],
         capture_output=True,
     )
+    if r.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"ffmpeg failed preparing driving video:\n{r.stderr.decode()}")
     print(f"Driving video prepared: {duration:.1f}s→{min(duration, max_secs):.0f}s, "
           f"{height}px→{min(height, max_height)}px tall")
     return tmp
@@ -133,6 +137,7 @@ def make_seamless_loop(animated: Path, audio: Path, output: Path) -> Path:
         capture_output=True,
     )
     if r.returncode != 0 or not pingpong_tmp.exists():
+        print(f"Warning: ping-pong step failed — using original clip (audio may loop abruptly):\n{r.stderr.decode()}")
         return animated
 
     r2 = subprocess.run(
@@ -147,6 +152,7 @@ def make_seamless_loop(animated: Path, audio: Path, output: Path) -> Path:
     pingpong_tmp.unlink(missing_ok=True)
 
     if r2.returncode != 0 or not output.exists():
+        print(f"Warning: loop extension failed — using original clip (audio may loop abruptly):\n{r2.stderr.decode()}")
         return animated
 
     print(f"Seamless loop: {clip_dur:.1f}s clip → {audio_dur:.1f}s looped ({n_cycles} ping-pong cycles)")
@@ -180,6 +186,27 @@ def trim_pkl(src: Path, max_secs: float) -> Path:
 
     print(f"Trimmed pkl: {total} → {keep} frames ({keep/fps:.1f}s) → {out.name}")
     return out
+
+
+def merge_audio_from_video(video_source: Path, animated: Path, output: Path) -> dict:
+    """Mux audio track from video_source into animated (which has no audio)."""
+    encoder, quality_args = _h264_encoder()
+    r = subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", str(animated),
+            "-i", str(video_source),
+            "-map", "0:v:0", "-map", "1:a:0",
+            "-c:v", encoder, *quality_args,
+            "-c:a", "aac", "-b:a", "192k",
+            "-shortest",
+            str(output),
+        ],
+        capture_output=True,
+    )
+    if r.returncode != 0:
+        return {"status": "failed", "error": "ffmpeg audio merge failed", "stderr": r.stderr.decode()}
+    return {"status": "completed"}
 
 
 def run_lipsync(

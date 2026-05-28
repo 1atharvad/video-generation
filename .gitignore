@@ -22,9 +22,15 @@ env/
 *.rar
 *.7z
 
+# facexlib runtime weights (downloaded at runtime)
+gfpgan/
+src/gfpgan/
+
 # Cloned repos (downloaded by setup_all(), not versioned here)
 liveportrait/LivePortrait/
 liveportrait/Wav2Lip/
+src/liveportrait/LivePortrait/
+src/liveportrait/Wav2Lip/
 
 # Model weights & checkpoints
 *.pth
@@ -46,10 +52,18 @@ liveportrait/driving_videos/*_trim*.pkl
 *.avi
 *.mov
 *.mkv
+*.mp4
 *.mp3
+*.wav
 *.flac
 outputs/
 results/
+uploads/
+
+# Allow committed assets and driving videos
+!assets/**
+!src/liveportrait/driving_videos/*.mp4
+!src/liveportrait/driving_videos/*.pkl
 
 # Wav2Lip inference scratch files
 liveportrait/Wav2Lip/temp/*

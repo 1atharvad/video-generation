@@ -25,10 +25,10 @@ def _get_device() -> str:
     if _device is None:
         if torch.cuda.is_available():
             _device = "cuda"
-        elif torch.backends.mps.is_available():
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             _device = "mps"
         else:
-            _device = "cpu"
+            raise RuntimeError("No GPU found. CUDA or Apple MPS is required — CPU inference is not supported.")
     return _device
 
 
@@ -106,9 +106,9 @@ def _detect_faces(
         break
 
     results = []
-    for rect, image in zip(predictions, images):
+    for i, (rect, image) in enumerate(zip(predictions, images)):
         if rect is None:
-            raise ValueError("Face not detected in a frame.")
+            raise ValueError(f"Face not detected in frame {i}.")
         y1 = max(0, rect[1] - pady1)
         y2 = min(image.shape[0], rect[3] + pady2)
         x1 = max(0, rect[0] - padx1)
@@ -200,16 +200,18 @@ def run_lipsync(
         cap = cv2.VideoCapture(str(face))
         fps = cap.get(cv2.CAP_PROP_FPS)
         full_frames = []
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if resize_factor > 1:
-                frame = cv2.resize(
-                    frame, (frame.shape[1] // resize_factor, frame.shape[0] // resize_factor)
-                )
-            full_frames.append(frame)
-        cap.release()
+        try:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                if resize_factor > 1:
+                    frame = cv2.resize(
+                        frame, (frame.shape[1] // resize_factor, frame.shape[0] // resize_factor)
+                    )
+                full_frames.append(frame)
+        finally:
+            cap.release()
 
     print(f"Wav2Lip: {len(full_frames)} frames at {fps:.1f}fps")
 
@@ -254,24 +256,25 @@ def run_lipsync(
             frame_h, frame_w = full_frames[0].shape[:2]
             avi_path = tmp / "result.avi"
             writer = cv2.VideoWriter(
-                str(avi_path), cv2.VideoWriter_fourcc(*"DIVX"), fps, (frame_w, frame_h)
+                str(avi_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_w, frame_h)
             )
 
             gen = _datagen(full_frames, mel_chunks, face_det_results, wav2lip_batch_size, static)
             n_batches = int(np.ceil(len(mel_chunks) / wav2lip_batch_size))
-            for imgs, mels_b, frames, coords in tqdm(gen, total=n_batches, desc="Wav2Lip"):
-                img_t = torch.FloatTensor(np.transpose(imgs, (0, 3, 1, 2))).to(device)
-                mel_t = torch.FloatTensor(np.transpose(mels_b, (0, 3, 1, 2))).to(device)
-                with torch.no_grad():
-                    pred = model(mel_t, img_t)
-                pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.0
-                for p, f, c in zip(pred, frames, coords):
-                    y1, y2, x1, x2 = c
-                    p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
-                    f[y1:y2, x1:x2] = p
-                    writer.write(f)
-
-            writer.release()
+            try:
+                for imgs, mels_b, frames, coords in tqdm(gen, total=n_batches, desc="Wav2Lip"):
+                    img_t = torch.FloatTensor(np.transpose(imgs, (0, 3, 1, 2))).to(device)
+                    mel_t = torch.FloatTensor(np.transpose(mels_b, (0, 3, 1, 2))).to(device)
+                    with torch.no_grad():
+                        pred = model(mel_t, img_t)
+                    pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.0
+                    for p, f, c in zip(pred, frames, coords):
+                        y1, y2, x1, x2 = c
+                        p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
+                        f[y1:y2, x1:x2] = p
+                        writer.write(f)
+            finally:
+                writer.release()
 
         subprocess.run(
             [

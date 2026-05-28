@@ -1,0 +1,26 @@
+{
+  "name": "video-generation",
+  "version": "1.0.0",
+  "description": "AI-powered talking-head video generator using LivePortrait (head motion) + Wav2Lip (lip sync) + GFPGAN (face restoration).",
+  "homepage": "https://github.com/1atharvad/video-generation#readme",
+  "bugs": {
+    "url": "https://github.com/1atharvad/video-generation/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1atharvad/video-generation.git"
+  },
+  "license": "ISC",
+  "author": "Atharva Devasthali",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd src && PYTHONPATH=. uvicorn dev_api:app --host 0.0.0.0 --port 8000 --reload",
+    "build": "docker compose build",
+    "start": "docker compose up -d",
+    "stop": "docker compose down",
+    "restart": "docker compose down && docker compose up -d",
+    "logs": "docker compose logs -f",
+    "rebuild": "docker compose down && docker compose up --build -d"
+  }
+}

@@ -1,0 +1,16 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+*.md
+node_modules/
+package.json
+assets/*.wav
+assets/*.mp4
+uploads/
+outputs/
+output.mp4
+src/gfpgan/
+liveportrait/driving_videos/*.mp4

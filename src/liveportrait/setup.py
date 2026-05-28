@@ -1,6 +1,5 @@
 import re
 import subprocess
-import sys
 import urllib.request
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from .config import (
     GFPGAN_WEIGHTS_DIR, GFPGAN_MODEL_PATH, GFPGAN_MODEL_URL,
     DRIVING_VIDEOS_DIR,
 )
+from .enhancement import patch_basicsr_for_mps
 
 
 def download_file(url: str, destination: Path):
@@ -31,7 +31,8 @@ def download_file(url: str, destination: Path):
         print(f"Download complete: {destination}\n")
     except Exception as e:
         bar.close()
-        print(f"Download error: {e}")
+        destination.unlink(missing_ok=True)
+        raise RuntimeError(f"Failed to download {destination.name}: {e}") from e
 
 
 def clone_repo(url: str, dest: Path, name: str):
@@ -43,8 +44,7 @@ def clone_repo(url: str, dest: Path, name: str):
         capture_output=True, text=True,
     )
     if result.returncode != 0:
-        print(f"Failed to clone {name}:\n{result.stderr}")
-        sys.exit(1)
+        raise RuntimeError(f"Failed to clone {name}:\n{result.stderr}")
     print(f"Cloned {name} to {dest}\n")
 
 
@@ -200,6 +200,7 @@ def setup_all():
     patch_liveportrait_for_pose_eyes()
     patch_liveportrait_device()
     patch_wav2lip_for_mps()
+    patch_basicsr_for_mps()
 
     lp_weights = Path(LP_REPO_DIR, "pretrained_weights", "liveportrait", "base_models", "appearance_feature_extractor.pth")
     if not lp_weights.exists():

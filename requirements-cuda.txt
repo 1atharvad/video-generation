@@ -1,3 +1,0 @@
-# CUDA PyTorch — installed automatically by setup_venv.bat when an NVIDIA GPU is detected.
-# To reinstall manually:
-#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124

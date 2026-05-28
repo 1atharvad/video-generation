@@ -77,7 +77,7 @@ def load_gfpgan():
     elif torch.backends.mps.is_available():
         device = torch.device('mps')
     else:
-        device = torch.device('cpu')
+        raise RuntimeError("No GPU found. CUDA or Apple MPS is required — CPU inference is not supported.")
     print(f"Loading GFPGAN on device: {device}")
     _gfpgan = GFPGANer(
         model_path=str(GFPGAN_MODEL_PATH),
@@ -132,30 +132,33 @@ def enhance_video(
     writer = cv2.VideoWriter(str(tmp_video), cv2.VideoWriter_fourcc(*"mp4v"), fps, (out_w, out_h))
 
     last_restored = None
-    for i in tqdm(range(frame_count), desc="GFPGAN"):
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if i % face_restore_step == 0:
-            _, _, restored = enhancer.enhance(frame, has_aligned=False, only_center_face=True, paste_back=True)
-            last_restored = restored
-        writer.write(last_restored if last_restored is not None else frame)
-
-    cap.release()
-    writer.release()
+    try:
+        for i in tqdm(range(frame_count), desc="GFPGAN"):
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if i % face_restore_step == 0:
+                _, _, restored = enhancer.enhance(frame, has_aligned=False, only_center_face=True, paste_back=True)
+                last_restored = restored
+            writer.write(last_restored if last_restored is not None else frame)
+    finally:
+        cap.release()
+        writer.release()
 
     encoder, quality_args = _hevc_encoder()
-    subprocess.run(
-        [
-            "ffmpeg", "-y", "-loglevel", "error",
-            "-i", str(tmp_video), "-i", str(input_path),
-            "-map", "0:v", "-map", "1:a",
-            "-vf", "hqdn3d=0:0:3:3",
-            "-c:v", encoder, *quality_args,
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k",
-            str(output_path),
-        ],
-        capture_output=True,
-    )
-    tmp_video.unlink(missing_ok=True)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-loglevel", "error",
+                "-i", str(tmp_video), "-i", str(input_path),
+                "-map", "0:v", "-map", "1:a",
+                "-vf", "hqdn3d=0:0:3:3",
+                "-c:v", encoder, *quality_args,
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "128k",
+                str(output_path),
+            ],
+            capture_output=True,
+        )
+    finally:
+        tmp_video.unlink(missing_ok=True)
